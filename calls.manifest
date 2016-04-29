@@ -1,0 +1,5 @@
+{
+  "wasm": "examples/calls/calls.wasm",
+  "text": "examples/calls/calls.wasm.txt",
+  "sourceRoot": "examples/calls/"
+}

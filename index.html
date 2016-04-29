@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="./src/parsedbginfo.js"></script>
+</head>
+<body>
+<script>
+  function correctStack(e, debugInfo) {
+    if (!debugInfo.dbgTables || !(e instanceof Error) || !e.stack)
+      return e;
+
+    e.stack = e.stack.replace(/wasm-function\[(\d+)\]@([^\n]+?):(\d+):(\d+)\n/g,
+        function (all, fnIndex, scriptUrl, line, col) {
+      var location = getDbgLocation(debugInfo, +fnIndex, +line);
+      if (!location) return all;
+      var sourceRoot = new URL(manifestFile.sourceRoot || './', document.location);
+      return location.fnName + '@' + (new URL(location.file, sourceRoot).href) +
+              ':' + location.line + ':' + location.col + '\n';
+    });
+    return e;
+  }
+
+  var manifest = fetch('calls.manifest').then((req) => req.json());
+  var manifestFile;
+
+  var p = manifest.then((manifestFile_) => {
+    manifestFile = manifestFile_;
+    return fetch(manifestFile.wasm).then((req) => req.arrayBuffer()).
+      then((ar) => new Uint8Array(ar));
+  }).then((data) => {
+    var debugInfo = getWasmDebugInfo(data);
+    var module = Wasm.instantiateModule(data, {env: env});
+    module.exports.test3(3);
+    try { module.exports.test3(-1); } catch (e) { console.log(correctStack(e, debugInfo)); }
+    try { module.exports.test3(1); } catch (e) { console.log(correctStack(e, debugInfo)); }
+  });
+  var env = {
+    test: function (i) { 
+      console.log(i);
+      if (i == 3) debugger;
+      else if (i == 1) throw new Error('ha'); 
+      return i; 
+    }
+  };
+</script>
+</body>
+</html>
